@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>SIGNA IDE</title>
+    <style>
+        body { font-family: 'Consolas', monospace; background: #0d0d0d; color: #e0e0e0; margin: 0; display: flex; flex-direction: column; height: 100vh; }
+        header { background: #1a1a1a; padding: 15px 25px; display: flex; justify-content: space-between; align-items: center; border-bottom: 3px solid #ffcc00; }
+        .container { display: flex; flex: 1; }
+        textarea { flex: 1; background: #121212; color: #ffcc00; border: none; padding: 25px; font-size: 18px; outline: none; resize: none; border-right: 2px solid #333; line-height: 1.5; }
+        .output-container { flex: 1; display: flex; flex-direction: column; background: #050505; }
+        .output { flex: 1; padding: 25px; overflow-y: auto; color: #00ffcc; font-size: 19px; }
+        .vol2-area { padding: 15px; background: #111; color: #666; border-top: 1px solid #333; min-height: 40px; }
+        .btns { display: flex; gap: 10px; }
+        button { background: #ffcc00; color: #000; border: none; padding: 10px 15px; cursor: pointer; font-weight: bold; border-radius: 4px; }
+        button:hover { background: #fff; }
+        .line { margin: 8px 0; border-left: 4px solid #ffcc00; padding-left: 12px; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div>⚡ <strong>SIGNA CORE</strong></div>
+        <div class="btns">
+            <button onclick="executarSigna()">EXECUTAR</button>
+            <button onclick="salvarArquivo('.signa')">SALVAR JOGO (.signa)</button>
+            <button onclick="salvarArquivo('.sig')">SALVAR SCRIPT (.sig)</button>
+        </div>
+    </header>
+
+    <div class="container">
+        <textarea id="editor" spellcheck="false" oninput="autoCompletar(this)">@void main #
+    *flent 'Sistema SIGNA Carregado'* 
+# <vol 1>
+<vol 2>
+Pronto para programar.</textarea>
+
+        <div class="output-container">
+            <div id="terminal" class="output"></div>
+            <div id="explicacao" class="vol2-area">...</div>
+        </div>
+    </div>
+
+    <script>
+        function autoCompletar(textarea) {
+            const cursor = textarea.selectionStart;
+            const texto = textarea.value;
+            const ultimaPalavra = texto.substring(0, cursor).split(/\s/).pop();
+            if (ultimaPalavra === "@void") {
+                const estrutura = " main #\n    *flent 'Novo Script'* \n# <vol 1>\n<vol 2>\n...";
+                textarea.value = texto.substring(0, cursor) + estrutura + texto.substring(cursor);
+                textarea.selectionEnd = cursor;
+            }
+        }
+
+        function salvarArquivo(extensao) {
+            const texto = document.getElementById('editor').value;
+            const blob = new Blob([texto], { type: 'text/plain' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = "projeto" + extensao;
+            a.click();
+        }
+
+        function executarSigna() {
+            const editor = document.getElementById('editor');
+            const terminal = document.getElementById('terminal');
+            const explicacaoArea = document.getElementById('explicacao');
+            terminal.innerHTML = ""; 
+            let codigoFonte = editor.value;
+            try {
+                const blocoHash = codigoFonte.match(/#([\s\S]*?)#/);
+                if (!blocoHash) throw "Erro: # # ausente";
+                const vol2Match = codigoFonte.match(/<vol 2>([\s\S]*)/);
+                explicacaoArea.innerText = (vol2Match && vol2Match[1]) ? vol2Match[1].trim() : "";
+                let variaveis = {};
+                let linhas = blocoHash[1].split('\n');
+                linhas.forEach(linha => {
+                    linha = linha.trim();
+                    if (!linha || linha.startsWith('!!')) return;
+                    if (linha.startsWith('*flent') && linha.endsWith('*')) {
+                        let msg = linha.match(/'(.*?)'/);
+                        terminal.innerHTML += `<div class="line">${msg ? msg[1] : ''}</div>`;
+                    }
+                    if (linha.startsWith('&') && linha.endsWith('&')) {
+                        let conteudo = linha.slice(1, -1);
+                        let [nome, ...resto] = conteudo.split('=');
+                        let valor = resto.join('=').trim();
+                        nome = nome.trim();
+                        if (valor.startsWith('%')) {
+                            let opcoes = valor.slice(1, -1).split(',').map(s => s.trim().replace(/"/g, ''));
+                            valor = opcoes[Math.floor(Math.random() * opcoes.length)];
+                        } else if (valor.startsWith('mat=')) {
+                            let exp = valor.replace('mat=', '');
+                            for (let v in variaveis) exp = exp.replace(new RegExp(v, 'g'), variaveis[v]);
+                            valor = eval(exp);
+                        }
+                        variaveis[nome] = valor;
+                    }
+                    if (linha.startsWith('$') && linha.endsWith('$')) {
+                        let varNome = linha.slice(1, -1).trim();
+                        terminal.innerHTML += `<div class="line" style="color:#ffcc00">${variaveis[varNome] || ''}</div>`;
+                    }
+                });
+            } catch (e) {
+                terminal.innerHTML = `<div style="color: #ff4444;">❌ ${e}</div>`;
+            }
+        }
+    </script>
+</body>
+</html>
